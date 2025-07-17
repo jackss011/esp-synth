@@ -12,21 +12,25 @@ constexpr float TWO_PI = 6.28318530717958647692f;
 // Declare the LUT in IRAM
 IRAM_ATTR float sine_lut[SINE_LUT_SIZE];
 
+static float slow_sin(float x) {
+    float intpart;
+    const float p = modf(x, &intpart) * M_PI * 2;
+    const float p1 = p <= M_PI ? p-1.570796f : p-4.712388f;
+    const float r2 = p1 * p1;
+    const float res = 1.f - r2/2.f + r2*r2/26.05072f;
+    return p <= M_PI ? res : -res;
+}
+
 // Place the init function in IRAM (if called from IRAM code or ISR)
 IRAM_ATTR void init_sine_lut() {
     for (size_t i = 0; i < SINE_LUT_SIZE; ++i) {
-        sine_lut[i] = wave_sin(TWO_PI * i / SINE_LUT_SIZE);
+        sine_lut[i] = slow_sin((float)i / (float)SINE_LUT_SIZE);
     }
 }
 
 float wave_sin(float x) {
-    // float intpart;
-    // const float p = modf(x, &intpart) * M_PI * 2;
-    // const float p1 = p <= M_PI ? p-1.570796f : p-4.712388f;
-    // const float r2 = p1 * p1;
-    // const float res = 1.f - r2/2.f + r2*r2/26.05072f;
-    // return p <= M_PI ? res : -res;
-    return sine_lut[(int)x*SINE_LUT_SIZE-1];
+    return slow_sin(x);
+    return sine_lut[(int)x*SINE_LUT_SIZE-1]; // TODO: fix
 }
 
 float wave_saw(float x) {

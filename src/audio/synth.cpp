@@ -77,10 +77,10 @@ void Synth::process_block(float *data, size_t len) {
     // gather configuration
     SynthConfig config = SynthConfig();
     config.osc1_config.enabled = true;
-    config.osc1_config.wave_index = 2;
+    config.osc1_config.wave_index = 1;
     config.osc1_config.gain_mult = 0.5;
 
-    config.osc2_config.enabled = true;
+    config.osc2_config.enabled = false;
     config.osc2_config.wave_index = 5;
     config.osc2_config.freq_mult = 2.05;
     config.osc2_config.gain_mult = 0.4;
