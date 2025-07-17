@@ -295,6 +295,9 @@ void setup() {
     display.clearDisplay();
     display.display();
 
+    // ---- SYNTH SETUP ----
+    synth.begin();
+
     // ---- TASKS ----
     // core 1
     xTaskCreatePinnedToCore(input_task,   "input_task",     4096, NULL,     configMAX_PRIORITIES - 1, NULL, 1);

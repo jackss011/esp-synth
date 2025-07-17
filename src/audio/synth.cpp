@@ -1,5 +1,6 @@
 #include "synth.hpp"
 #include "wavetable.hpp"
+#include "audio_math.hpp"
 
 
 FORCE_INLINE float OscState::step(float dt, const OscillatorConfig &config) {
@@ -48,10 +49,6 @@ FORCE_INLINE void EnvelopeState::step() {
 }
 
 
-void Synth::update_config(const SynthConfig &new_config) {
-
-}
-
 void Synth::process_midi_event(const MidiEvent &event)
 {
     switch (event.get_event_type()) {
@@ -73,17 +70,10 @@ void Synth::process_midi_event(const MidiEvent &event)
     }
 }
 
-void Synth::process_block(float *data, size_t len) {
-    // gather configuration
-    SynthConfig config = SynthConfig();
-    config.osc1_config.enabled = true;
-    config.osc1_config.wave_index = 1;
-    config.osc1_config.gain_mult = 0.5;
 
-    config.osc2_config.enabled = false;
-    config.osc2_config.wave_index = 5;
-    config.osc2_config.freq_mult = 2.05;
-    config.osc2_config.gain_mult = 0.4;
+
+void Synth::process_block(float *data, size_t len) {
+    sync_config();
 
     // precompute variables for the entire block
     voice_state.envelope_state.set_rates(config.envelope);
@@ -92,11 +82,24 @@ void Synth::process_block(float *data, size_t len) {
     
     // compute block
     for(size_t i = 0; i < len; i++) {
+        // oscillators
         const float y1 = voice_state.osc1_state.step(dt, config.osc1_config);
         const float y2 = voice_state.osc2_state.step(dt, config.osc2_config);
         const float y3 = voice_state.osc3_state.step(dt, config.osc3_config);
 
+        // envelope
         voice_state.envelope_state.step();
         data[i] = (y1 + y2 + y3) * voice_state.envelope_state.value;
+
+        // boost
+        data[i] = saturate_hard(data[i] * config.boost.boost_mult) * config.boost.gain_mult; 
     }
+}
+
+void Synth::update_config(const SynthConfig &new_config) {
+    xQueueOverwrite(config_queue, &new_config);
+}
+
+void Synth::sync_config() {
+    xQueueReceive(config_queue, &config, 0);
 }

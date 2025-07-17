@@ -105,6 +105,15 @@ public:
     void process_midi_event(const MidiEvent &event);
     void process_block(float *data, size_t len);
 
+    void begin() {
+        config_queue = xQueueCreate(1, sizeof(SynthConfig));
+    }
+
 private:
     VoiceState voice_state;
+
+    QueueHandle_t config_queue;
+    SynthConfig config;
+
+    void sync_config();
 };
