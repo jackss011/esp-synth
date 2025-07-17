@@ -70,9 +70,9 @@ struct BoostConfig {
 
 // ------- FILTER --------
 struct LowPassConfig {
-    float cutoff_freq = 100;
+    float cutoff_hz = 10000;
     float emphasis_perc = 0;
-    float countour_perc = 0;
+    float countour_dhz = 0;
     EnvelopeConfig cutoff_envelope;
 };
 
@@ -96,6 +96,7 @@ struct SynthConfig {
     OscillatorConfig osc3_config;
     EnvelopeConfig envelope;
     BoostConfig boost;
+    LowPassConfig lowpass;
 };
 
 

@@ -74,6 +74,8 @@ void Synth::process_midi_event(const MidiEvent &event)
 
 void Synth::process_block(float *data, size_t len) {
     sync_config();
+    // Serial.printf("%f, %f, %f\n", config.lowpass.cutoff_hz, config.lowpass.emphasis_perc, config.lowpass.countour_dhz);
+    // delay(1000);
 
     // precompute variables for the entire block
     voice_state.envelope_state.set_rates(config.envelope);

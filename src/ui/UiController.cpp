@@ -5,8 +5,7 @@
 
 // ---------- GAIN SELECTOR ----------
 static const char* gain_labels[] = {"0.0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"};
-static int32_t gain_values[] =     {0,        10,    20,    30,    40,    50,    60,    70,    80,    90,  100}; // scaled by 100
-
+static int32_t gain_values[] =     {0,        10,    20,    30,    40,    50,    60,    70,    80,    90,  100};
 static const SelectorConfig gain_config = {
     .display_values = gain_labels,
     .values = gain_values,
@@ -25,7 +24,6 @@ static int32_t shape_values[] = {
     WaveIndex::RectWide,
     WaveIndex::RectNarrow
 };
-
 static const SelectorConfig shape_config = {
     .display_values = shape_labels,
     .values = shape_values,
@@ -37,7 +35,6 @@ static const SelectorConfig shape_config = {
 // ---------- DETUNE SELECTOR ----------
 static const char* detune_labels[] = {"-20", "-16", "-12", "-10", "-7", "-5", "-3", "0"};
 static int32_t detune_values[] =     {-20, -16, -12, -10, -7, -5, -3, 0};
-
 static const SelectorConfig detune_config = {
     .display_values = detune_labels,
     .values = detune_values,
@@ -49,7 +46,6 @@ static const SelectorConfig detune_config = {
 // ---------- RANGE SELECTOR ----------
 static const char* range_labels[] = {"32'", "16'", "8'", "4'", "2'"};
 static int32_t range_values[] = {32, 16, 8, 4, 2};
-
 static const SelectorConfig range_config = {
     .display_values = range_labels,
     .values = range_values,
@@ -63,12 +59,10 @@ static const char* time_labels[] = {
     "0.1s", "0.2s", "0.3s", "0.4s", "0.5s", "0.6s", "0.7s", "0.8s", "0.9s", "1s",
     "2s", "3s", "4s", "5s", "8s", "10s", "15s", "30s", "60s"
 };
-
 static int32_t time_values[] = {
     100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
     2000, 3000, 4000, 5000, 8000, 10000, 15000, 30000, 60000
 };
-
 static const SelectorConfig time_config = {
     .display_values = time_labels,
     .values         = time_values,
@@ -80,7 +74,6 @@ static const SelectorConfig time_config = {
 // ---------- BOOST -----------
 static const char* boost_labels[] = {"+0", "+1", "+2"};
 static int32_t boost_values[] = {10, 15, 20};
-
 static const SelectorConfig boost_config = {
     .display_values = boost_labels,
     .values = boost_values,
@@ -89,10 +82,44 @@ static const SelectorConfig boost_config = {
     .default_index = 0
 };
 
+
+// --------- FILTER ----------
+static const char* contour_labels[] = {
+    "none", "+100", "+500", "+1k", "+2k", "+3k", "+4k"
+};
+static int32_t contour_values[] = {
+    0, 100, 500, 1000, 2000, 3000, 4000
+};
+static const SelectorConfig contour_config = {
+    .display_values = contour_labels,
+    .values         = contour_values,
+    .norm_factor    = 1,
+    .count          = sizeof(contour_values) / sizeof(contour_values[0]),
+    .default_index  = 0  // none
+};
+
+
+static const char* cutoff_labels[] = {
+    "1kHz", "2kHz", "3kHz", "4kHz", "5kHz", "6kHz", "7kHz",
+    "8kHz", "9kHz", "10kHz", "12kHz", "15kHz", "18kHz"
+};
+static int32_t cutoff_values[] = {
+    1000, 2000, 3000, 4000, 5000, 6000, 7000,
+    8000, 9000, 10000, 12000, 15000, 18000
+};
+static const SelectorConfig cutoff_config = {
+    .display_values = cutoff_labels,
+    .values         = cutoff_values,
+    .norm_factor    = 1,
+    .count          = sizeof(cutoff_values) / sizeof(cutoff_values[0]),
+    .default_index  = 9 // Starts at 1kHz
+};
+
+
 // ---------- Layout Constants ----------
 static const int16_t COL1 = 6;
 static const int16_t COL2 = 128 / 2 - 8;
-static const int16_t COL3 = 128 - 20;
+static const int16_t COL3 = 128 - 24;
 static const int16_t ROW2 = 16;
 static const int16_t ROW1 = 40;
 
@@ -131,6 +158,9 @@ struct Table2x3Layout {
     }
 };
 
+// =============================
+// || TABS
+// =============================
 struct OscTab : Widget {
     OscillatorConfig *config;
 
@@ -193,8 +223,48 @@ struct EnvTab : Widget {
         env_cfg->attack_secs = attack.get_value_asf32();
         env_cfg->decay_secs = decay.get_value_asf32();
         env_cfg->sustain_gain = sustain.get_value_asf32();
+        env_cfg->release_secs = decay.get_value_asf32() * 2;
+
         boost_cfg->boost_mult = boost_en.get_value_asf32();
         boost_cfg->gain_mult  = gain.get_value_asf32();
+    }
+};
+
+struct FltTab : Widget {
+    LowPassConfig *config;
+
+    Selector attack  = Selector("att", time_config);
+    Selector decay   = Selector("dec", time_config);
+    Selector sustain = Selector("sus", gain_config);
+
+    Selector cutoff    = Selector("cut",   cutoff_config);
+    Selector resonance = Selector("res",   gain_config);
+    Selector contour  = Selector("cont",  contour_config);
+
+    Table2x3Layout layout;
+
+    FltTab(const char* key, LowPassConfig *config) 
+        : Widget(key, 0, 0), config(config) {
+            layout.first_row(&cutoff, &resonance, &contour);
+            layout.second_row(&attack, &decay, &sustain);
+            resonance.index = 3;
+        }
+
+    virtual void render(Adafruit_SSD1306 *gfx) override {
+        layout.render(gfx);   
+    }
+
+    virtual void process_event(const InputEvent &event) override {
+        layout.process_event(event);
+
+        config->cutoff_envelope.attack_secs =  attack.get_value_asf32();
+        config->cutoff_envelope.decay_secs =   decay.get_value_asf32();
+        config->cutoff_envelope.sustain_gain = sustain.get_value_asf32();
+        config->cutoff_envelope.release_secs = decay.get_value_asf32() / 2;
+
+        config->cutoff_hz   = cutoff.get_value_asf32();
+        config->emphasis_perc = resonance.get_value_asf32();
+        config->countour_dhz = contour.get_value_asf32();
     }
 };
 
@@ -203,6 +273,7 @@ static auto osc1_tab = OscTab("o1",  nullptr);
 static auto osc2_tab = OscTab("o2",  nullptr);
 static auto osc3_tab = OscTab("o3",  nullptr);
 static auto env_tab  = EnvTab("env", nullptr, nullptr);
+static auto flt_tab  = FltTab("flt", nullptr);
 
 static auto tabs = WidgetGroup();
 
@@ -213,12 +284,14 @@ void UiController::init() {
     osc3_tab.config = &config.osc3_config;
     env_tab.env_cfg =  &config.envelope;
     env_tab.boost_cfg = &config.boost;
+    flt_tab.config = &config.lowpass;
 
     tabs.add(nullptr);
     tabs.add(&osc1_tab);
     tabs.add(&osc2_tab);
     tabs.add(&osc3_tab);
     tabs.add(&env_tab);
+    tabs.add(&flt_tab);
 }
 
 
