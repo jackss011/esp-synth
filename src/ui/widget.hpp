@@ -14,7 +14,7 @@ struct Widget {
     virtual const char *get_key() { return key; }
     virtual void render(Adafruit_SSD1306 *gfx) {}
     virtual void process_event(const InputEvent &event) {}
-    virtual void nudge(int16_t dir) {}
+    // virtual void nudge(int16_t dir) {}
     virtual void load(const Preferences &prefs) {}
     virtual void store(const Preferences &prefs) {}
 
@@ -26,7 +26,8 @@ protected:
 };
 
 
-using SwitchCallback = void(*)(bool);
+// using SwitchCallback = void(*)(bool);
+using SwitchCallback = std::function<void(bool)>;
 
 struct Switch : Widget {
     bool value = false;
@@ -35,7 +36,10 @@ struct Switch : Widget {
     Switch(const char *key, int16_t x, int16_t y)
         : Widget(key, x, y) {}
 
-    virtual void nudge(int16_t dir) override {
+    Switch(const char *key)
+        : Widget(key, 0, 0) {}
+
+    void nudge(int16_t dir) {
         if(dir == 0) return;
         const bool new_value = dir > 0;
 
@@ -50,10 +54,15 @@ struct Switch : Widget {
         gfx->print(value ? "ON" : "OFF");
     }
 
+    virtual void process_event(const InputEvent &event) override {
+        nudge(event.value);
+    }
+
     bool get_value() { return value; }
 };
 
-using SelectorCallback = void(*)(int32_t value);
+// using SelectorCallback = void(*)(int32_t value);
+using SelectorCallback = std::function<void(int32_t)>;
 
 struct SelectorConfig
 {
@@ -73,8 +82,13 @@ struct Selector : Widget {
         : Widget(key, x, y), config(config) {
             index = config.default_index;
         }
+    
+    Selector(const char *key, const SelectorConfig &config)
+        : Widget(key, 0, 0), config(config) {
+            index = config.default_index;
+        }
 
-    virtual void nudge(int16_t dir) override {
+    void nudge(int16_t dir) {
         if(dir == 0) return;
         const int32_t new_index = constrain(index + dir, 0, config.count -1);
 
@@ -82,6 +96,10 @@ struct Selector : Widget {
             index = new_index;
             if(cb) cb(config.values[index]);
         }
+    }
+
+    virtual void process_event(const InputEvent &event) override {
+        nudge(event.value);
     }
 
     virtual void render(Adafruit_SSD1306 *gfx) override {
@@ -112,8 +130,7 @@ struct WidgetGroup {
     void process_event(const InputEvent &event) {
         for(size_t i = 0; i < count; i++) {
             if(event.id == input_masks[i] && event.shifed == input_shifted[i]) {
-                Serial.printf("Hello %d\n", event.value);
-                children[i]->nudge(event.value);
+                children[i]->process_event(event);
             }
         }
     }

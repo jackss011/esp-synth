@@ -61,6 +61,12 @@ struct EnvelopeState {
     FORCE_INLINE void step();
 };
 
+// ------- BOOST --------
+struct BoostConfig {
+    float boost_mult = 1.f;
+    float gain_mult  = 1.f;
+};
+
 
 // ------- FILTER --------
 struct LowPassConfig {
@@ -89,6 +95,7 @@ struct SynthConfig {
     OscillatorConfig osc2_config;
     OscillatorConfig osc3_config;
     EnvelopeConfig envelope;
+    BoostConfig boost;
 };
 
 

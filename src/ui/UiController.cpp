@@ -77,6 +77,18 @@ static const SelectorConfig time_config = {
     .default_index  = 9 // "1s"
 };
 
+// ---------- BOOST -----------
+static const char* boost_labels[] = {"+0", "+1", "+2"};
+static int32_t boost_values[] = {10, 15, 20};
+
+static const SelectorConfig boost_config = {
+    .display_values = boost_labels,
+    .values = boost_values,
+    .norm_factor = 10,
+    .count = 3,
+    .default_index = 0
+};
+
 // ---------- Layout Constants ----------
 static const int16_t COL1 = 6;
 static const int16_t COL2 = 128 / 2 - 8;
@@ -84,86 +96,105 @@ static const int16_t COL3 = 128 - 20;
 static const int16_t ROW2 = 16;
 static const int16_t ROW1 = 40;
 
+struct Table2x3Layout {
+    Widget *table[2][3] = { nullptr };
+
+    inline void first_row(Widget *c1, Widget *c2, Widget *c3) {
+        table[0][0] = c1; table[0][1] = c2; table[0][2] = c3;
+
+        if(c1) { c1->x = COL1; c1->y = ROW1; }
+        if(c2) { c2->x = COL2; c2->y = ROW1; }
+        if(c3) { c3->x = COL3; c3->y = ROW1; }
+    }
+
+    inline void second_row(Widget *c1, Widget *c2, Widget * c3) {
+        table[1][0] = c1; table[1][1] = c2; table[1][2] = c3;
+
+        if(c1) { c1->x = COL1; c1->y = ROW2; }
+        if(c2) { c2->x = COL2; c2->y = ROW2; }
+        if(c3) { c3->x = COL3; c3->y = ROW2; }
+    }
+
+    void render(Adafruit_SSD1306 *gfx) {
+        for(size_t i = 0; i < 2; i++)
+            for(size_t j = 0; j < 3; j++)
+                if(table[i][j]) table[i][j]->render(gfx);
+    }
+
+    void process_event(const InputEvent &event) {
+        const int row = event.shifed ? 1 : 0;
+        const int col = (int)event.id - (int)InputId::Encoder0;
+        if(col < 0 || col >= 3) return;
+
+        Widget *w = table[row][col];
+        if(w) w->process_event(event);
+    }
+};
+
 struct OscTab : Widget {
     OscillatorConfig *config;
 
-    Selector range   = Selector("range",   COL1, ROW1,  range_config);
-    Selector detune  = Selector("detune",  COL2, ROW1,  detune_config);
-    Selector shape   = Selector("shape",   COL3, ROW1,  shape_config);
-    Selector gain    = Selector("gain",    COL2, ROW2,  gain_config);
-    Switch   en      = Switch  ("en",      COL3, ROW2);
+    Selector range   = Selector("range",   range_config);
+    Selector detune  = Selector("detune",  detune_config);
+    Selector shape   = Selector("shape",   shape_config);
+    Selector gain    = Selector("gain",    gain_config);
+    Switch   en      = Switch  ("en");
+
+    Table2x3Layout layout;
 
     OscTab(const char* key, OscillatorConfig *config = nullptr) : Widget(key, 0, 0), config(config) {
-
+        layout.first_row(&range, &detune, &shape);
+        layout.second_row(nullptr, &gain, &en);
     }
 
     virtual void render(Adafruit_SSD1306 *gfx) override {
-        range.render(gfx);
-        detune.render(gfx); 
-        shape.render(gfx);
-        gain.render(gfx); 
-        en.render(gfx);     
+        layout.render(gfx); 
     }
 
     virtual void process_event(const InputEvent &event) override {
-        if (!event.shifed) {
-            if (event.id == InputId::Encoder0) {
-                range.nudge(event.value);
-                config->set_freq_mult(1.f/range.get_value_asf32(), detune.get_value());
-            } 
-            else if (event.id == InputId::Encoder1) {
-                detune.nudge(event.value);
-                config->set_freq_mult(1.f/range.get_value_asf32(), detune.get_value());
-            } 
-            else if (event.id == InputId::Encoder2) {
-                shape.nudge(event.value);
-                config->wave_index = shape.get_value();
-            }
-        } else {
-            if (event.id == InputId::Encoder1) {
-                gain.nudge(event.value);
-            } else if (event.id == InputId::Encoder2) {
-                en.nudge(event.value);
-            }
-        }
+        layout.process_event(event);
 
+        config->set_freq_mult(1.f/range.get_value_asf32(), detune.get_value());
+        config->wave_index = shape.get_value();
+        config->gain_mult = gain.get_value_asf32();
+        config->enabled = en.get_value();
         // Serial.printf("%s: %.6f\n", key, config->freq_mult);
     }
 };
 
 
 struct EnvTab : Widget {
-    EnvelopeConfig *config;
+    EnvelopeConfig *env_cfg;
+    BoostConfig *boost_cfg;
 
-    Selector attack  = Selector("att",   COL1, ROW1,  time_config);
-    Selector decay   = Selector("dec",   COL2, ROW1,  time_config);
-    Selector sustain = Selector("sus",   COL3, ROW1,  gain_config);
+    Selector attack  = Selector("att", time_config);
+    Selector decay   = Selector("dec", time_config);
+    Selector sustain = Selector("sus", gain_config);
 
-    EnvTab(const char* key, EnvelopeConfig *config) : Widget(key, 0, 0), config(config) {
+    Selector boost_en = Selector("boost", boost_config);
+    Selector gain     = Selector("gain",  gain_config);
 
-    }
+    Table2x3Layout layout;
+
+    EnvTab(const char* key, EnvelopeConfig *env_cfg, BoostConfig *boost_cfg) 
+        : Widget(key, 0, 0), env_cfg(env_cfg), boost_cfg(boost_cfg) {
+            layout.first_row(&attack, &decay, &sustain);
+            layout.second_row(nullptr, &boost_en, &gain);
+            gain.index = 10;
+        }
 
     virtual void render(Adafruit_SSD1306 *gfx) override {
-        attack.render(gfx);
-        decay.render(gfx); 
-        sustain.render(gfx);   
+        layout.render(gfx);   
     }
 
     virtual void process_event(const InputEvent &event) override {
-        if (!event.shifed) {
-            if (event.id == InputId::Encoder0) {
-                attack.nudge(event.value);
-                config->attack_secs = attack.get_value_asf32();
-            }
-            else if (event.id == InputId::Encoder1) {
-                decay.nudge(event.value);
-                config->decay_secs = decay.get_value_asf32();
-            } 
-            else if (event.id == InputId::Encoder2) {
-                sustain.nudge(event.value);
-                config->sustain_gain = sustain.get_value_asf32();
-            }
-        }
+        layout.process_event(event);
+
+        env_cfg->attack_secs = attack.get_value_asf32();
+        env_cfg->decay_secs = decay.get_value_asf32();
+        env_cfg->sustain_gain = sustain.get_value_asf32();
+        boost_cfg->boost_mult = boost_en.get_value_asf32();
+        boost_cfg->gain_mult  = gain.get_value_asf32();
     }
 };
 
@@ -171,7 +202,7 @@ struct EnvTab : Widget {
 static auto osc1_tab = OscTab("o1",  nullptr);
 static auto osc2_tab = OscTab("o2",  nullptr);
 static auto osc3_tab = OscTab("o3",  nullptr);
-static auto env_tab  = EnvTab("env", nullptr);
+static auto env_tab  = EnvTab("env", nullptr, nullptr);
 
 static auto tabs = WidgetGroup();
 
@@ -180,7 +211,8 @@ void UiController::init() {
     osc1_tab.config = &config.osc1_config;
     osc2_tab.config = &config.osc2_config;
     osc3_tab.config = &config.osc3_config;
-    env_tab.config =  &config.envelope;
+    env_tab.env_cfg =  &config.envelope;
+    env_tab.boost_cfg = &config.boost;
 
     tabs.add(nullptr);
     tabs.add(&osc1_tab);
