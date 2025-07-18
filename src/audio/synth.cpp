@@ -119,7 +119,6 @@ void Synth::process_block(float *data, size_t len) {
         if(voice_state.enabled) {
             voice_state.enabled = false;
             voice_state.envelope_state.trigger_off();
-            // Serial.println("off");
         }
 
         arp_state.clear();
@@ -129,7 +128,7 @@ void Synth::process_block(float *data, size_t len) {
         MidiNote note_to_play = last_note;
         
         // change the note to play if arpeggio is on
-        if(config.arpeggiator.enabled || true) {
+        if(config.arpeggiator.enabled) {
             arp_state.step(config.arpeggiator);
             note_to_play = tracker.get_at(arp_state.note_index % tracker.get_count());
         } 
@@ -139,8 +138,6 @@ void Synth::process_block(float *data, size_t len) {
             voice_state.enabled = true;
             voice_state.note = note_to_play;
             voice_state.envelope_state.trigger_on();
-            // Serial.print(note_to_play.note_index);
-            // Serial.println(" on");
         }
     }
 
@@ -182,32 +179,3 @@ void Synth::update_config(const SynthConfig &new_config) {
 void Synth::sync_config() {
     xQueueReceive(config_queue, &config, 0);
 }
-
-
-
-
-
-// Serial.printf("\npush: %d\n", note.note_index);
-// arp_state.push(note);
-// Serial.print("LIST: ");
-// for(int i = 0; i < arp_state.get_count(); i++) {
-//     Serial.print(arp_state.get_at(i).note_index);
-//     Serial.print(" ");
-// }
-// Serial.println();
-
-
-
-
-// if(voice_state.enabled && note == voice_state.note) {
-//     voice_state.envelope_state.trigger_off();
-//     voice_state.enabled = false;
-// }
-// Serial.printf("\npop: %d\n", note.note_index);
-// arp_state.pop(note);
-// Serial.print("LIST: ");
-// for(int i = 0; i < arp_state.get_count(); i++) {
-//     Serial.print(arp_state.get_at(i).note_index);
-//     Serial.print(" ");
-// }
-// Serial.println();

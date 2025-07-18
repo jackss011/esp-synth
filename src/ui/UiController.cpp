@@ -144,10 +144,10 @@ static const SelectorConfig cutoff_config = {
 
 // ---------- Layout Constants ----------
 static const int16_t COL1 = 6;
-static const int16_t COL2 = 128 / 2 - 8;
-static const int16_t COL3 = 128 - 24;
+static const int16_t COL2 = 128 / 2 - 16;
+static const int16_t COL3 = 128 - 36;
 static const int16_t ROW2 = 16;
-static const int16_t ROW1 = 40;
+static const int16_t ROW1 = 44;
 
 struct Table2x3Layout {
     Widget *table[2][3] = { nullptr };
@@ -220,10 +220,10 @@ struct ArpTab : Widget {
 struct OscTab : Widget {
     OscillatorConfig *config;
 
-    Selector range   = Selector("range",   range_config);
-    Selector detune  = Selector("detune",  detune_config);
-    Selector shape   = Selector("shape",   shape_config);
-    Selector gain    = Selector("gain",    gain_config);
+    Selector range   = Selector("octv",  range_config);
+    Selector detune  = Selector("tune",  detune_config);
+    Selector shape   = Selector("shp",   shape_config);
+    Selector gain    = Selector("gain",  gain_config);
     Switch   en      = Switch  ("en");
 
     Table2x3Layout layout;
@@ -259,7 +259,7 @@ struct EnvTab : Widget {
     Selector decay   = Selector("dec", time_config);
     Selector sustain = Selector("sus", gain_config);
 
-    Selector boost_en = Selector("boost", boost_config);
+    Selector boost_en = Selector("bst",   boost_config);
     Selector gain     = Selector("gain",  gain_config);
 
     Table2x3Layout layout;
@@ -300,7 +300,7 @@ struct FltTab : Widget {
 
     Selector cutoff    = Selector("cut",   cutoff_config);
     Selector resonance = Selector("res",   gain_config);
-    Selector contour  = Selector("cont",  contour_config);
+    Selector contour   = Selector("cou",  contour_config);
 
     Table2x3Layout layout;
 
@@ -405,16 +405,23 @@ bool UiController::render_to_buffer() {
         gfx->setCursor(x, 0);
         gfx->print(tab_names[i]);
         if(tab_index == i) {
+            gfx->drawFastHLine(x, 11, spacing*0.8, SSD1306_WHITE);
             gfx->drawFastHLine(x, 12, spacing*0.8, SSD1306_WHITE);
-            gfx->drawFastHLine(x, 13, spacing*0.8, SSD1306_WHITE);
         }
         
         x += spacing;
     }
 
     // render layer indicator
-    const int16_t y = layer_shift_on ? 16+2 : 40+2;
-    gfx->fillRect(0, y, 3, 20, SSD1306_WHITE);
+    const int16_t y0 = layer_shift_on ? 18-1 : 46-1;
+    const int16_t w = 1;
+    const int16_t h = 3;
+
+    for(int i = 0; i < 4; i++) {
+        int16_t yi = y0 + i * (h+2);
+        gfx->fillRect(0,       yi,  w, h, SSD1306_WHITE);
+        gfx->fillRect(128-w-1, yi,  w, h, SSD1306_WHITE);
+    }
 
     // render correct tab
     Widget *active_tab = tabs.get(tab_index);

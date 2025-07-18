@@ -50,8 +50,16 @@ struct Switch : Widget {
     }
 
     virtual void render(Adafruit_SSD1306 *gfx) override {
-        gfx->setCursor(x, y);
+        const int16_t x_text = x + 7;
+        gfx->setCursor(x_text, y);
+        gfx->print(key);
+
+        gfx->setCursor(x_text, y+12);
         gfx->print(value ? "ON" : "OFF");
+
+        const int16_t thumb_y = value ? 0 : 10;
+        gfx->drawRect(x,   y,           4, 19,  SSD1306_WHITE);
+        gfx->fillRect(x+1, y + thumb_y, 2, 9,   SSD1306_WHITE);
     }
 
     virtual void process_event(const InputEvent &event) override {
@@ -103,13 +111,24 @@ struct Selector : Widget {
     }
 
     virtual void render(Adafruit_SSD1306 *gfx) override {
-        gfx->setCursor(x, y);
+        const int16_t x_text = x + 7;
+        gfx->setCursor(x_text, y);
+        gfx->print(key);
+
+        gfx->setCursor(x_text, y+12);
         gfx->print(config.display_values[index]);
+
+        const float perc = 1.f - (float)index / (config.count - 1);
+        const int16_t thumb_y = roundf(perc * 14);
+
+        gfx->drawRect(x,   y,           4, 19,  SSD1306_WHITE);
+        gfx->fillRect(x+1, y + thumb_y, 2, 4,   SSD1306_WHITE);
     }
 
     int32_t get_value() { return config.values[index]; }
     float   get_value_asf32() { return (float)(config.values[index]) / config.norm_factor; }
 };
+
 
 struct WidgetGroup {
     static const size_t MAX_CHILDREN = 64;
