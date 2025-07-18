@@ -70,13 +70,58 @@ struct BoostConfig {
 
 // ------- FILTER --------
 struct LowPassConfig {
-    float cutoff_hz = 10000;
-    float emphasis_perc = 0;
+    float cutoff_hz = 2000;
+    float emphasis_perc = 0.1;
     float countour_dhz = 0;
     EnvelopeConfig cutoff_envelope;
 };
 
+struct LowPassState {
+    float p0   = 0.f;
+	float p1   = 0.f;
+	float p2   = 0.f;
+	float p3   = 0.f;
+	float p32  = 0.f;
+	float p33  = 0.f;
+	float p34  = 0.f;
 
+    float current_wc = 0.f;
+
+    void process_block(float *samples, size_t n, const LowPassConfig &config);
+};
+
+
+// #include <cmath>
+
+class TPTLowPass {
+public:
+    void process_block(float* samples, size_t n, const LowPassConfig& config) {
+        // Convert cutoff Hz to angular frequency (rad/s)
+        float wc = 2.0f * (float)M_PI * config.cutoff_hz;
+        float T = 1.0f / SYNTH_SR;
+        float g = tanf(0.5f * wc * T);  // TPT bilinear transform
+
+        // Convert emphasis percentage to normalized resonance factor [0.0 - 1.0]
+        float R = config.emphasis_perc;
+        if (R > 1.0f) R = 1.0f;
+        if (R < 0.0f) R = 0.0f;
+
+        for (size_t i = 0; i < n; ++i) {
+            float v = (samples[i] - R * state_ - state_) / (1.0f + g);
+            float lp = v + state_;
+            state_ = lp + v;
+
+            samples[i] = lp;
+        }
+    }
+
+    void reset() {
+        state_ = 0.0f;
+    }
+
+private:
+    float state_ = 0.0f;
+};
 
 // ------- VOICE --------
 struct VoiceState {
@@ -112,6 +157,7 @@ public:
 
 private:
     VoiceState voice_state;
+    TPTLowPass lowpass_state;
 
     QueueHandle_t config_queue;
     SynthConfig config;

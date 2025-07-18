@@ -49,6 +49,48 @@ FORCE_INLINE void EnvelopeState::step() {
 }
 
 
+static FORCE_INLINE float fast_tanh(float x) 
+{
+	float x2 = x * x;
+	return x * (27.f + x2) / (27.f + 9.f * x2);
+}
+
+#define HZ_TO_WC(hz) ((hz) * 6.28318530718f / SYNTH_SR)
+
+#define EXP_APPROACH(target, current, rate) \
+    ((current) + ((target) - (current)) * (rate))
+
+#define SYNTH_LOWPASS_CUTOFF_TIMING_SECS 0.1f
+
+/**
+ * adapted from: https://github.com/ddiakopoulos/MoogLadders
+ * added dynamic frequency
+ */
+void LowPassState::process_block(float *samples, size_t n, const LowPassConfig &config) {
+    float k = config.emphasis_perc * 4;
+    float base_wc = HZ_TO_WC(config.cutoff_hz);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        current_wc = EXP_APPROACH(base_wc, current_wc, 1.f / (SYNTH_LOWPASS_CUTOFF_TIMING_SECS * SYNTH_SR));
+ 
+        float out = p3 * 0.360891f + p32 * 0.417290f + p33 * 0.177896f + p34 * 0.0439725f;
+
+        p34 = p33;
+        p33 = p32;
+        p32 = p3;
+
+        p0 += (fast_tanh(samples[i] - k * out) - fast_tanh(p0)) * current_wc;
+        p1 += (fast_tanh(p0) - fast_tanh(p1)) * current_wc;
+        p2 += (fast_tanh(p1) - fast_tanh(p2)) * current_wc;
+        p3 += (fast_tanh(p2) - fast_tanh(p3)) * current_wc;
+
+        samples[i] = out;
+    }
+}
+
+
+
 void Synth::process_midi_event(const MidiEvent &event)
 {
     switch (event.get_event_type()) {
@@ -96,6 +138,14 @@ void Synth::process_block(float *data, size_t len) {
         // boost
         data[i] = saturate_hard(data[i] * config.boost.boost_mult) * config.boost.gain_mult; 
     }
+
+    // apply low pass
+    // lowpass_state.process_block(data, len, config.lowpass);
+
+    // saturate for good measure
+    for(size_t i = 0; i < len; i++) {
+        data[i] = saturate_hard(data[i]);
+    }
 }
 
 void Synth::update_config(const SynthConfig &new_config) {
@@ -105,3 +155,4 @@ void Synth::update_config(const SynthConfig &new_config) {
 void Synth::sync_config() {
     xQueueReceive(config_queue, &config, 0);
 }
+
