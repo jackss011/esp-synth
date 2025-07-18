@@ -95,18 +95,39 @@ void Synth::process_midi_event(const MidiEvent &event)
 {
     switch (event.get_event_type()) {
         case MidiEventType::NoteOn: {
-            if(!voice_state.enabled || event.get_note() != voice_state.note) {
-                voice_state.note = event.get_note();
-                voice_state.envelope_state.trigger_on();
-                voice_state.enabled = true;
+            const MidiNote note = event.get_note();
+
+            // if(!voice_state.enabled || note != voice_state.note) {
+            //     voice_state.note = note;
+            //     voice_state.envelope_state.trigger_on();
+            //     voice_state.enabled = true;
+            // }
+            Serial.printf("\npush: %d\n", note.note_index);
+            arp_state.push(note);
+            Serial.print("LIST: ");
+            for(int i = 0; i < arp_state.get_count(); i++) {
+                Serial.print(arp_state.get_at(i).note_index);
+                Serial.print(" ");
             }
+            Serial.println();
+
             break;
         }
         case MidiEventType::NoteOff: {
-            if(voice_state.enabled && event.get_note() == voice_state.note) {
-                voice_state.envelope_state.trigger_off();
-                voice_state.enabled = false;
+            const MidiNote note = event.get_note();
+
+            // if(voice_state.enabled && note == voice_state.note) {
+            //     voice_state.envelope_state.trigger_off();
+            //     voice_state.enabled = false;
+            // }
+            Serial.printf("\npop: %d\n", note.note_index);
+            arp_state.pop(note);
+            Serial.print("LIST: ");
+            for(int i = 0; i < arp_state.get_count(); i++) {
+                Serial.print(arp_state.get_at(i).note_index);
+                Serial.print(" ");
             }
+            Serial.println();
             break;
         }
     }
@@ -119,6 +140,49 @@ void Synth::process_block(float *data, size_t len) {
     // Serial.printf("%f, %f, %f\n", config.lowpass.cutoff_hz, config.lowpass.emphasis_perc, config.lowpass.countour_dhz);
     // delay(1000);
 
+    const auto last_note = arp_state.last_note();
+
+    // not playing any notes
+    if(last_note == MidiNote::None) {
+        if(voice_state.enabled) {
+            voice_state.enabled = false;
+            voice_state.envelope_state.trigger_off();
+            Serial.println("off");
+        }
+
+        arp_state.active_time = -1;
+    }
+    // is playing at least 1 note
+    else {
+        MidiNote note_to_play = last_note;
+
+        if(config.argeggiator.enabled || true) {
+            int64_t now = millis();
+
+            if(arp_state.active_time < 0) {
+                arp_state.active_time = now;
+                arp_state.current_note = last_note;
+                arp_state.current_note_index = 0;
+            }
+
+            if(now >= arp_state.active_time + config.argeggiator.period_ms()/4) {
+                arp_state.active_time = now;
+                arp_state.current_note_index++;
+                arp_state.current_note = arp_state.get_at(arp_state.current_note_index % arp_state.get_count());
+            }
+
+            note_to_play = arp_state.current_note;
+        } 
+
+        if(voice_state.note != note_to_play || !voice_state.enabled) {
+            voice_state.enabled = true;
+            voice_state.note = note_to_play;
+            voice_state.envelope_state.trigger_on();
+            Serial.print(note_to_play.note_index);
+            Serial.println(" on");
+        }
+    }
+
     // precompute variables for the entire block
     voice_state.envelope_state.set_rates(config.envelope);
     const float freq = voice_state.note.get_frequency();
@@ -127,9 +191,9 @@ void Synth::process_block(float *data, size_t len) {
     // compute block
     for(size_t i = 0; i < len; i++) {
         // oscillators
-        const float y1 = voice_state.osc1_state.step(dt, config.osc1_config);
-        const float y2 = voice_state.osc2_state.step(dt, config.osc2_config);
-        const float y3 = voice_state.osc3_state.step(dt, config.osc3_config);
+        const float y1 = voice_state.osc1_state.step(dt, config.osc1);
+        const float y2 = voice_state.osc2_state.step(dt, config.osc2);
+        const float y3 = voice_state.osc3_state.step(dt, config.osc3);
 
         // envelope
         voice_state.envelope_state.step();

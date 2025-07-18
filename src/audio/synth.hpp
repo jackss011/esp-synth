@@ -4,6 +4,7 @@
 #include "midi.hpp"
 #include "config.h"
 #include "perf.h"
+#include "arpeggiator.hpp"
 
 // ------- OSCILLATOR --------
 struct OscillatorConfig {
@@ -126,7 +127,7 @@ private:
 // ------- VOICE --------
 struct VoiceState {
     bool enabled = false;
-    MidiNote note;
+    MidiNote note = MidiNote::None;
     OscState osc1_state;
     OscState osc2_state;
     OscState osc3_state;
@@ -136,9 +137,10 @@ struct VoiceState {
 
 // ------- SYNTH --------
 struct SynthConfig {
-    OscillatorConfig osc1_config;
-    OscillatorConfig osc2_config;
-    OscillatorConfig osc3_config;
+    ArpeggiatorConfig argeggiator;
+    OscillatorConfig osc1;
+    OscillatorConfig osc2;
+    OscillatorConfig osc3;
     EnvelopeConfig envelope;
     BoostConfig boost;
     LowPassConfig lowpass;
@@ -156,6 +158,7 @@ public:
     }
 
 private:
+    ArpeggiatorState arp_state;
     VoiceState voice_state;
     TPTLowPass lowpass_state;
 

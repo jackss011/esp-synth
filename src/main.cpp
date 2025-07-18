@@ -141,7 +141,8 @@ void display_task(void *arg) {
 
     UiController controller(&display);
     controller.init();
-
+    synth.update_config(controller.config);
+    
     InputEvent event;
 
     while(true) {

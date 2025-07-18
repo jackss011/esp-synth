@@ -183,12 +183,14 @@ struct OscTab : Widget {
 
     virtual void process_event(const InputEvent &event) override {
         layout.process_event(event);
+        update_configs();
+    }
 
+    void update_configs() {
         config->set_freq_mult(1.f/range.get_value_asf32(), detune.get_value());
         config->wave_index = shape.get_value();
         config->gain_mult = gain.get_value_asf32();
         config->enabled = en.get_value();
-        // Serial.printf("%s: %.6f\n", key, config->freq_mult);
     }
 };
 
@@ -219,7 +221,10 @@ struct EnvTab : Widget {
 
     virtual void process_event(const InputEvent &event) override {
         layout.process_event(event);
+        update_configs();
+    }
 
+    void update_configs() {
         env_cfg->attack_secs = attack.get_value_asf32();
         env_cfg->decay_secs = decay.get_value_asf32();
         env_cfg->sustain_gain = sustain.get_value_asf32();
@@ -256,7 +261,10 @@ struct FltTab : Widget {
 
     virtual void process_event(const InputEvent &event) override {
         layout.process_event(event);
+        update_configs();
+    }
 
+    void update_configs() {
         config->cutoff_envelope.attack_secs =  attack.get_value_asf32();
         config->cutoff_envelope.decay_secs =   decay.get_value_asf32();
         config->cutoff_envelope.sustain_gain = sustain.get_value_asf32();
@@ -279,9 +287,9 @@ static auto tabs = WidgetGroup();
 
 
 void UiController::init() {
-    osc1_tab.config = &config.osc1_config;
-    osc2_tab.config = &config.osc2_config;
-    osc3_tab.config = &config.osc3_config;
+    osc1_tab.config = &config.osc1;
+    osc2_tab.config = &config.osc2;
+    osc3_tab.config = &config.osc3;
     env_tab.env_cfg =  &config.envelope;
     env_tab.boost_cfg = &config.boost;
     flt_tab.config = &config.lowpass;
@@ -292,6 +300,9 @@ void UiController::init() {
     tabs.add(&osc3_tab);
     tabs.add(&env_tab);
     tabs.add(&flt_tab);
+
+    osc1_tab.en.nudge(1);
+    osc1_tab.update_configs();
 }
 
 

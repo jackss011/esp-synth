@@ -21,8 +21,8 @@ struct MidiNote {
     float get_frequency() const {
         // A4 = MIDI note 69 = 440 Hz
         return 440.0f * std::pow(2.0f, (note_index - 69) / 12.0f);
-
     }
+    
     bool operator==(const MidiNote& other) const {
         return note_index == other.note_index;
     }
@@ -30,6 +30,16 @@ struct MidiNote {
     bool operator!=(const MidiNote& other) const {
         return note_index != other.note_index;
     }
+
+    bool operator<(const MidiNote& other) const {
+        return note_index < other.note_index;
+    }
+
+    bool operator>(const MidiNote& other) const {
+        return note_index > other.note_index;
+    }
+
+    static const MidiNote None;
 };
 
 struct __attribute__((packed)) MidiEvent {
