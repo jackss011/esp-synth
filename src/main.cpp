@@ -142,7 +142,7 @@ void display_task(void *arg) {
     UiController controller(&display);
     controller.init();
     synth.update_config(controller.config);
-    
+
     InputEvent event;
 
     while(true) {
@@ -245,7 +245,6 @@ void input_task(void *arg) {
 
 void setup() {
     Serial.begin(115200);
-    init_sine_lut(); // TODO: fix this
 
     midi_event_queue =  xQueueCreate(MIDI_EVENTS_QUEUE_SIZE,  sizeof(MidiEvent));
     input_event_queue = xQueueCreate(INPUT_EVENTS_QUEUE_SIZE, sizeof(InputEvent));

@@ -1,16 +1,11 @@
 #include "wavetable.hpp"
 #include <math.h>
 #include "esp_attr.h"
+#include "generated/luts.hpp"
 
 float wave_silence(float x) {
     return 0;
 }
-
-constexpr size_t SINE_LUT_SIZE = 1024;
-constexpr float TWO_PI = 6.28318530717958647692f;
-
-// Declare the LUT in IRAM
-IRAM_ATTR float sine_lut[SINE_LUT_SIZE];
 
 static float slow_sin(float x) {
     float intpart;
@@ -21,16 +16,9 @@ static float slow_sin(float x) {
     return p <= M_PI ? res : -res;
 }
 
-// Place the init function in IRAM (if called from IRAM code or ISR)
-IRAM_ATTR void init_sine_lut() {
-    for (size_t i = 0; i < SINE_LUT_SIZE; ++i) {
-        sine_lut[i] = slow_sin((float)i / (float)SINE_LUT_SIZE);
-    }
-}
-
 float wave_sin(float x) {
-    return slow_sin(x);
-    return sine_lut[(int)x*SINE_LUT_SIZE-1]; // TODO: fix
+    // return slow_sin(x);
+    return lutgen_sin[LUTEGEN_INDEX(x)];
 }
 
 float wave_saw(float x) {
