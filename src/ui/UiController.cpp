@@ -3,6 +3,31 @@
 #include "audio/wavetable.hpp"
 #include "audio/audio_math.hpp"
 
+// ---------- DIVISION SELECTOR ----------
+static const char* division_labels[] = {"1", "1/2", "1/4", "1/8"};
+static int32_t division_values[] =     {1,     2,     4,     8};
+
+static const SelectorConfig division_config = {
+    .display_values = division_labels,
+    .values = division_values,
+    .norm_factor = 1,
+    .count = 4,
+    .default_index = 0    // "1"
+};
+
+
+// ---------- TEMPO SELECTOR ----------
+static const char* tempo_labels[] = {"80", "100", "120", "130", "150"};
+static int32_t tempo_values[] =     { 80,   100,   120,   130,   150 };
+
+static const SelectorConfig tempo_config = {
+    .display_values = tempo_labels,
+    .values = tempo_values,
+    .norm_factor = 1,
+    .count = 5,
+    .default_index = 2  // "120" BPM
+};
+
 
 // ---------- GAIN SELECTOR ----------
 static const char* gain_labels[] = {"0.0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"};
@@ -162,6 +187,36 @@ struct Table2x3Layout {
 // =============================
 // || TABS
 // =============================
+struct ArpTab : Widget {
+    ArpeggiatorConfig *config;
+
+    Switch   en       = Switch  ("en");
+    Selector division = Selector("div",  division_config);
+    Selector tempo    = Selector("bpm",  tempo_config);
+
+    Table2x3Layout layout;
+
+    ArpTab(const char* key, ArpeggiatorConfig *config = nullptr) : Widget(key, 0, 0), config(config) {
+        layout.first_row(&en, &division, &tempo);
+    }
+
+    virtual void render(Adafruit_SSD1306 *gfx) override {
+        layout.render(gfx); 
+    }
+
+    virtual void process_event(const InputEvent &event) override {
+        layout.process_event(event);
+        update_configs();
+    }
+
+    void update_configs() {
+        config->enabled = en.get_value();
+        config->time_division = division.get_value();
+        config->tempo_bpm = tempo.get_value();
+    }
+};
+
+
 struct OscTab : Widget {
     OscillatorConfig *config;
 
@@ -278,6 +333,7 @@ struct FltTab : Widget {
 };
 
 
+static auto arp_tab  = ArpTab("arp", nullptr);
 static auto osc1_tab = OscTab("o1",  nullptr);
 static auto osc2_tab = OscTab("o2",  nullptr);
 static auto osc3_tab = OscTab("o3",  nullptr);
@@ -288,6 +344,7 @@ static auto tabs = WidgetGroup();
 
 
 void UiController::init() {
+    arp_tab.config  = &config.arpeggiator;
     osc1_tab.config = &config.osc1;
     osc2_tab.config = &config.osc2;
     osc3_tab.config = &config.osc3;
@@ -295,7 +352,7 @@ void UiController::init() {
     env_tab.boost_cfg = &config.boost;
     flt_tab.config = &config.lowpass;
 
-    tabs.add(nullptr);
+    tabs.add(&arp_tab);
     tabs.add(&osc1_tab);
     tabs.add(&osc2_tab);
     tabs.add(&osc3_tab);
@@ -342,7 +399,8 @@ bool UiController::render_to_buffer() {
     // render header
     int16_t x = 1;
     for(size_t i = 0; i < TAB_COUNT; i++) {
-        const int16_t spacing = i > Tab::Osc3 ? 25 : 18;
+        const char *tab_name  = tab_names[i];
+        const int16_t spacing = strlen(tab_name) * 9;
       
         gfx->setCursor(x, 0);
         gfx->print(tab_names[i]);

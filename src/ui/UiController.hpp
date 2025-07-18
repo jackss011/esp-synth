@@ -19,7 +19,7 @@ namespace Tab {
 };
 
 constexpr const char* tab_names[] = {
-    "in", "o1", "o2", "o3", "env", "flt"
+    "arp", "o1", "o2", "o3", "env", "flt"
 };
 
 const uint8_t TAB_COUNT = Tab::Filter + 1;
