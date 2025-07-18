@@ -137,7 +137,7 @@ struct VoiceState {
 
 // ------- SYNTH --------
 struct SynthConfig {
-    ArpeggiatorConfig argeggiator;
+    ArpeggiatorConfig arpeggiator;
     OscillatorConfig osc1;
     OscillatorConfig osc2;
     OscillatorConfig osc3;
@@ -158,6 +158,8 @@ public:
     }
 
 private:
+    NoteTracker tracker;
+
     ArpeggiatorState arp_state;
     VoiceState voice_state;
     TPTLowPass lowpass_state;

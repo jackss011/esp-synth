@@ -95,39 +95,11 @@ void Synth::process_midi_event(const MidiEvent &event)
 {
     switch (event.get_event_type()) {
         case MidiEventType::NoteOn: {
-            const MidiNote note = event.get_note();
-
-            // if(!voice_state.enabled || note != voice_state.note) {
-            //     voice_state.note = note;
-            //     voice_state.envelope_state.trigger_on();
-            //     voice_state.enabled = true;
-            // }
-            Serial.printf("\npush: %d\n", note.note_index);
-            arp_state.push(note);
-            Serial.print("LIST: ");
-            for(int i = 0; i < arp_state.get_count(); i++) {
-                Serial.print(arp_state.get_at(i).note_index);
-                Serial.print(" ");
-            }
-            Serial.println();
-
+            tracker.push(event.get_note());
             break;
         }
         case MidiEventType::NoteOff: {
-            const MidiNote note = event.get_note();
-
-            // if(voice_state.enabled && note == voice_state.note) {
-            //     voice_state.envelope_state.trigger_off();
-            //     voice_state.enabled = false;
-            // }
-            Serial.printf("\npop: %d\n", note.note_index);
-            arp_state.pop(note);
-            Serial.print("LIST: ");
-            for(int i = 0; i < arp_state.get_count(); i++) {
-                Serial.print(arp_state.get_at(i).note_index);
-                Serial.print(" ");
-            }
-            Serial.println();
+            tracker.pop(event.get_note());
             break;
         }
     }
@@ -140,46 +112,35 @@ void Synth::process_block(float *data, size_t len) {
     // Serial.printf("%f, %f, %f\n", config.lowpass.cutoff_hz, config.lowpass.emphasis_perc, config.lowpass.countour_dhz);
     // delay(1000);
 
-    const auto last_note = arp_state.last_note();
+    const auto last_note = tracker.last_note();
 
     // not playing any notes
     if(last_note == MidiNote::None) {
         if(voice_state.enabled) {
             voice_state.enabled = false;
             voice_state.envelope_state.trigger_off();
-            Serial.println("off");
+            // Serial.println("off");
         }
 
-        arp_state.active_time = -1;
+        arp_state.clear();
     }
     // is playing at least 1 note
     else {
         MidiNote note_to_play = last_note;
-
-        if(config.argeggiator.enabled || true) {
-            int64_t now = millis();
-
-            if(arp_state.active_time < 0) {
-                arp_state.active_time = now;
-                arp_state.current_note = last_note;
-                arp_state.current_note_index = 0;
-            }
-
-            if(now >= arp_state.active_time + config.argeggiator.period_ms()/4) {
-                arp_state.active_time = now;
-                arp_state.current_note_index++;
-                arp_state.current_note = arp_state.get_at(arp_state.current_note_index % arp_state.get_count());
-            }
-
-            note_to_play = arp_state.current_note;
+        
+        // change the note to play if arpeggio is on
+        if(config.arpeggiator.enabled || true) {
+            arp_state.step(config.arpeggiator);
+            note_to_play = tracker.get_at(arp_state.note_index % tracker.get_count());
         } 
 
+        // check if we need to change/start a note
         if(voice_state.note != note_to_play || !voice_state.enabled) {
             voice_state.enabled = true;
             voice_state.note = note_to_play;
             voice_state.envelope_state.trigger_on();
-            Serial.print(note_to_play.note_index);
-            Serial.println(" on");
+            // Serial.print(note_to_play.note_index);
+            // Serial.println(" on");
         }
     }
 
@@ -212,11 +173,41 @@ void Synth::process_block(float *data, size_t len) {
     }
 }
 
+
 void Synth::update_config(const SynthConfig &new_config) {
     xQueueOverwrite(config_queue, &new_config);
 }
+
 
 void Synth::sync_config() {
     xQueueReceive(config_queue, &config, 0);
 }
 
+
+
+
+
+// Serial.printf("\npush: %d\n", note.note_index);
+// arp_state.push(note);
+// Serial.print("LIST: ");
+// for(int i = 0; i < arp_state.get_count(); i++) {
+//     Serial.print(arp_state.get_at(i).note_index);
+//     Serial.print(" ");
+// }
+// Serial.println();
+
+
+
+
+// if(voice_state.enabled && note == voice_state.note) {
+//     voice_state.envelope_state.trigger_off();
+//     voice_state.enabled = false;
+// }
+// Serial.printf("\npop: %d\n", note.note_index);
+// arp_state.pop(note);
+// Serial.print("LIST: ");
+// for(int i = 0; i < arp_state.get_count(); i++) {
+//     Serial.print(arp_state.get_at(i).note_index);
+//     Serial.print(" ");
+// }
+// Serial.println();

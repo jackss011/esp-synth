@@ -1,6 +1,7 @@
 #include "UiController.hpp"
 #include "input/Btn.hpp"
 #include "audio/wavetable.hpp"
+#include "audio/audio_math.hpp"
 
 
 // ---------- GAIN SELECTOR ----------
@@ -189,7 +190,7 @@ struct OscTab : Widget {
     void update_configs() {
         config->set_freq_mult(1.f/range.get_value_asf32(), detune.get_value());
         config->wave_index = shape.get_value();
-        config->gain_mult = gain.get_value_asf32();
+        config->gain_mult = volume_to_gain(gain.get_value_asf32());
         config->enabled = en.get_value();
     }
 };
@@ -231,7 +232,7 @@ struct EnvTab : Widget {
         env_cfg->release_secs = decay.get_value_asf32() * 2;
 
         boost_cfg->boost_mult = boost_en.get_value_asf32();
-        boost_cfg->gain_mult  = gain.get_value_asf32();
+        boost_cfg->gain_mult  = volume_to_gain(gain.get_value_asf32());
     }
 };
 
