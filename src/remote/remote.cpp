@@ -6,38 +6,30 @@
 #include "uuids.h"
 #include "compress.hpp"
 
-#define SCREEN_CHUNK_NUN 4
-#define SCREEN_CHUNK_SIZE (SCREEN_BUFFER_SIZE/SCREEN_CHUNK_NUN)
-#define PAGE_SIZE (128*2)
+#define SCREEN_BLOCK_NUM  4
+#define SCREEN_BLOCK_SIZE (128*2)
 
 static NimBLEServer* s_server;
-static NimBLECharacteristic* s_screen_blechar;
-static NimBLECharacteristic* s_screen_diff_blechar;
 static InputEventCallback s_input_callback = nullptr;
 
-static SemaphoreHandle_t s_screen_mutex;
+NimBLECharacteristic* s_block_chars[4] = {
+    nullptr, nullptr, nullptr, nullptr
+};
+
 static uint8_t s_screen_buffer[SCREEN_BUFFER_SIZE] = {0};
-static uint8_t s_screen_buffer_sent[SCREEN_BUFFER_SIZE] = {0};
+
+static const char *BLE_REMOTE_TAG = "BLE_REMOTE";
 
 
 class ServerCallbacks : public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
-        // Serial.printf("Client address: %s\n", connInfo.getAddress().toString().c_str());
-
-        /**
-         *  We can use the connection handle here to ask for different connection parameters.
-         *  Args: connection handle, min connection interval, max connection interval
-         *  latency, supervision timeout.
-         *  Units; Min/Max Intervals: 1.25 millisecond increments.
-         *  Latency: number of intervals allowed to skip.
-         *  Timeout: 10 millisecond increments.
-         */
+        ESP_LOGD(BLE_REMOTE_TAG, "Client address: %s\n", connInfo.getAddress().toString().c_str());
+        // SET: min connection interval, max connection interval, latency, supervision timeout.
         pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
     }
 
     void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
-        // Serial.printf("Client disconnected - start advertising\n");
-        memset(s_screen_buffer_sent, 0, SCREEN_BUFFER_SIZE);
+        ESP_LOGD(BLE_REMOTE_TAG, "Client disconnected - start advertising\n");
         NimBLEDevice::startAdvertising();
     }
 
@@ -48,7 +40,6 @@ namespace RemoteEvents {
     enum Value {
         None = 0,
         Input = 0x01,
-        SetScreenPage = 0x02,
     };
 };
 
@@ -64,49 +55,35 @@ class CommandCbs : public NimBLECharacteristicCallbacks {
             event.id = input_id_from_uint8(data[1]);
             event.value = (int8_t)data[2];
             event.shifed = data[3] > 0;
-            // Serial.printf("id: %d, val: %d, shift: %d\n", event.id, event.value, event.shifed);
+
+            ESP_LOGD(BLE_REMOTE_TAG, "id: %d, val: %d, shift: %d\n", event.id, event.value, event.shifed);
             if(s_input_callback) s_input_callback(event);
         }
-        else if(len == 2 && data[0] == RemoteEvents::SetScreenPage) {
-            if(screen_page_idx < 0 || screen_page_idx > 4) return;
-            screen_page_idx = data[1];
-        }
     }
-public:
-    uint8_t screen_page_idx = 0;
-    uint8_t get_page_idx() { return screen_page_idx; }
-
 } command_blechar_cb;
 
 
-class ScreenCbs : public NimBLECharacteristicCallbacks {
-    void onRead(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override {
-        uint8_t page_idx = command_blechar_cb.get_page_idx();
-
-        static uint8_t rle_data[SCREEN_BUFFER_SIZE * 2];
-        size_t rle_len = 0;
-
+static void align_screen_blocks(bool notify = false) {
+    static uint8_t rle_data[SCREEN_BUFFER_SIZE * 2];
+    
+    for(size_t i = 0; i < SCREEN_BLOCK_NUM; i++) {
+        auto c = s_block_chars[i];
+        
         // START_PERF(read_bt)
-        if (xSemaphoreTake(s_screen_mutex, 0)) {
-            size_t write_offset = page_idx * PAGE_SIZE;
-            uint8_t *data = s_screen_buffer + write_offset;
-            size_t data_len = PAGE_SIZE;
+        size_t write_offset = i * SCREEN_BLOCK_SIZE;
+        uint8_t *data = s_screen_buffer + write_offset;
+        size_t data_len = SCREEN_BLOCK_SIZE;
+        
+        size_t rle_len = 0;
+        rle_compress(data, data_len, rle_data, &rle_len);
 
-            rle_compress(data, data_len, rle_data, &rle_len);
-
-            pCharacteristic->setValue(rle_data, rle_len);
-
-            command_blechar_cb.screen_page_idx++;
-            xSemaphoreGive(s_screen_mutex);
-        }
-        // STOP_PERF(read_bt, 1);
+        c->setValue(rle_data, rle_len);
+        if(notify) c->notify();
     }
-} screen_blechar_cb;
+}
 
 
-void remote_init() {
-    s_screen_mutex = xSemaphoreCreateMutex();
-
+void remote::init() {
     NimBLEDevice::init(BLE_NAME);
 
     s_server = NimBLEDevice::createServer();
@@ -118,12 +95,10 @@ void remote_init() {
     command_blechar->setValue("");
     command_blechar->setCallbacks(&command_blechar_cb);
 
-    s_screen_blechar = service->createCharacteristic(SCREEN_BLECHAR_UUID, NIMBLE_PROPERTY::READ);
-    s_screen_blechar->setValue(s_screen_buffer, PAGE_SIZE);
-    s_screen_blechar->setCallbacks(&screen_blechar_cb);
-    
-    s_screen_diff_blechar = service->createCharacteristic(SCREEN_DIFF_BLECHAR_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    s_screen_diff_blechar->setValue("");
+    for(size_t i = 0; i < SCREEN_BLOCK_NUM; i++) {
+        s_block_chars[i] = service->createCharacteristic(UUID_BLOCK[i], NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    }
+    align_screen_blocks(false);
 
     service->start();
 
@@ -136,7 +111,7 @@ void remote_init() {
 }
 
 
-void remote_set_input_cb(InputEventCallback cb) {
+void remote::set_input_cb(InputEventCallback cb) {
     s_input_callback = cb;
 }
 
@@ -146,21 +121,12 @@ void remote_set_input_cb(InputEventCallback cb) {
  * rle on colmaj data -> x0.93 -> nope
  */
 
-void remote_send_screen(const uint8_t *data) {
-    static uint8_t screen_patch[SCREEN_BUFFER_SIZE];
-    static uint8_t screen_patch_rle[SCREEN_BUFFER_SIZE * 2];
-    size_t rle_len = 0;
-
-    if (xSemaphoreTake(s_screen_mutex, portMAX_DELAY)) {
-        bool is_same = memcmp(data, s_screen_buffer, SCREEN_BUFFER_SIZE) == 0;
-        if(!is_same) {
-            memcpy(s_screen_buffer, data, SCREEN_BUFFER_SIZE);
-        }
-        xSemaphoreGive(s_screen_mutex);
-        // s_screen_diff_blechar->setValue(s_screen_buffer, PAGE_SIZE);
-        if(!is_same) s_screen_diff_blechar->notify();
-    }
-    return;
+void remote::send_screen(const uint8_t *data) {
+    bool is_same = memcmp(data, s_screen_buffer, SCREEN_BUFFER_SIZE) == 0;
+    if(!is_same) {
+        memcpy(s_screen_buffer, data, SCREEN_BUFFER_SIZE);
+        align_screen_blocks(true);
+    }        
 }
 
 

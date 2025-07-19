@@ -4,6 +4,9 @@
 
 using InputEventCallback = void(*)(const InputEvent &);
 
-void remote_init();
-void remote_set_input_cb(InputEventCallback cb);
-void remote_send_screen(const uint8_t *data);
+namespace remote {
+    void init();
+    void set_input_cb(InputEventCallback cb);
+    void send_screen(const uint8_t *data);
+};
+

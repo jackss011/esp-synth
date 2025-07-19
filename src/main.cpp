@@ -167,7 +167,7 @@ void display_task(void *arg) {
             display.display();
         }
 
-        remote_send_screen(display.getBuffer());
+        remote::send_screen(display.getBuffer());
 
         delay(20); // 50hz
     }
@@ -314,8 +314,8 @@ void setup() {
     synth.begin();
 
     // ---- REMOTE SETUP ----
-    remote_init();
-    remote_set_input_cb(on_remote_input);
+    remote::init();
+    remote::set_input_cb(on_remote_input);
 
     // ---- TASKS ----
     // core 1
