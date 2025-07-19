@@ -167,6 +167,8 @@ void display_task(void *arg) {
             display.display();
         }
 
+        remote_send_screen(display.getBuffer());
+
         delay(20); // 50hz
     }
 }
