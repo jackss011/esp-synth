@@ -9,6 +9,7 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "driver/i2s.h"
+
 #include "Wire.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
@@ -23,6 +24,7 @@
 #include "input/Btn.hpp"
 #include "input/Encoder.hpp"
 #include "ui/UiController.hpp"
+#include "remote/remote.hpp"
 
 QueueHandle_t midi_event_queue;
 QueueHandle_t input_event_queue;
@@ -173,8 +175,8 @@ void display_task(void *arg) {
 // ─────────────────────────────────────────────────────────────
 // ||   TASK: INPUT
 // ─────────────────────────────────────────────────────────────
-Btn btn_lx(33);
-Btn btn_rx(5);
+Btn btn_lx(5);
+Btn btn_rx(33);
 Btn btn_shift(32);
 Encoder encoder_0(17, 4, false);
 Encoder encoder_1(19, 18, false);
@@ -243,6 +245,17 @@ void input_task(void *arg) {
 }
 
 
+// ─────────────────────────────────────────────────────────────
+// ||   TASK: REMOTE
+// ─────────────────────────────────────────────────────────────
+static void on_remote_input(const InputEvent &event) {
+    xQueueSendToBack(input_event_queue, &event, pdMS_TO_TICKS(200));
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// ||   MAIN
+// ─────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
 
@@ -298,6 +311,10 @@ void setup() {
     // ---- SYNTH SETUP ----
     synth.begin();
 
+    // ---- REMOTE SETUP ----
+    remote_init();
+    remote_set_input_cb(on_remote_input);
+
     // ---- TASKS ----
     // core 1
     xTaskCreatePinnedToCore(input_task,   "input_task",     4096, NULL,     configMAX_PRIORITIES - 1, NULL, 1);
@@ -307,6 +324,4 @@ void setup() {
     xTaskCreatePinnedToCore(i2s_task,     "i2s_task",       4096, NULL,     configMAX_PRIORITIES - 1, NULL, 0);
 }
 
-void loop() {
-    delay(1000);
-}
+void loop() { delay(1000); }

@@ -369,13 +369,13 @@ void UiController::process_event(const InputEvent &event) {
         // handle left btn
         case InputId::BtnLx: {
             if(event.value == BtnEvent::Press)
-                tab_index = static_cast<Tab::Value>((tab_index + 1) % TAB_COUNT);
+                tab_index = static_cast<Tab::Value>((tab_index + TAB_COUNT - 1) % TAB_COUNT);
             break; 
         }
         // handle right btn
         case InputId::BtnRx: {
             if(event.value == BtnEvent::Press)
-                tab_index = static_cast<Tab::Value>((tab_index + TAB_COUNT - 1) % TAB_COUNT);
+                tab_index = static_cast<Tab::Value>((tab_index + 1) % TAB_COUNT);
             break;
         }
         // handle shift btn (visualization only)

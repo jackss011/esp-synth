@@ -12,6 +12,7 @@
 #define UART_RX_BUFFER_SIZE     128
 #define MIDI_EVENTS_QUEUE_SIZE  128
 #define INPUT_EVENTS_QUEUE_SIZE 64
+#define BLE_NAME "ESP-Synth"
 
 // SYNTH
 #define SYNTH_CHUNK_SIZE    ((size_t)128)
