@@ -109,11 +109,8 @@ void Synth::process_midi_event(const MidiEvent &event)
 
 void Synth::process_block(float *data, size_t len) {
     sync_config();
-    // Serial.printf("%f, %f, %f\n", config.lowpass.cutoff_hz, config.lowpass.emphasis_perc, config.lowpass.countour_dhz);
-    // delay(1000);
 
-    const auto last_note = tracker.last_note();
-
+    const auto last_note = tracker.most_recent();
     // not playing any notes
     if(last_note == MidiNote::None) {
         if(voice_state.enabled) {
@@ -129,8 +126,11 @@ void Synth::process_block(float *data, size_t len) {
         
         // change the note to play if arpeggio is on
         if(config.arpeggiator.enabled) {
-            arp_state.step(config.arpeggiator);
-            note_to_play = tracker.get_at(arp_state.note_index % tracker.get_count());
+            // arpeggiator ticked
+            if(arp_state.step(config.arpeggiator)) {
+                arp_state.arp_note = tracker.right_of(arp_state.arp_note); // get note at the right
+            }
+            note_to_play = arp_state.arp_note;
         } 
 
         // check if we need to change/start a note

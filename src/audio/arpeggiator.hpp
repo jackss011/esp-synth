@@ -15,12 +15,14 @@ struct ArpeggiatorConfig {
 struct ArpeggiatorState {
     int64_t active_time = -1;
     size_t   note_index = 0;
+    MidiNote arp_note = MidiNote::None;
 
     bool is_active() { return active_time > 1; }
 
     void clear() {
         active_time = -1;
         note_index = 0;
+        arp_note = MidiNote::None;
     }
 
     bool step(const ArpeggiatorConfig &config) {
